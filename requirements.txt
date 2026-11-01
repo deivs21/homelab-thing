@@ -1,0 +1,8 @@
+fastapi==0.115.*
+uvicorn[standard]==0.32.*
+aiofiles==24.1.*
+google-genai
+pydantic
+python-multipart==0.0.12
+python-magic==0.4.27
+aiosqlite==0.20.*

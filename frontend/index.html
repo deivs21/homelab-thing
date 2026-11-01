@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Dual-Hub Homelab</title>
+<link rel="manifest" href="/manifest.json" />
+<meta name="theme-color" content="#76C457" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack.min.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack-all.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<style>
+  :root { --bg:#FAFAFA; --bg-soft:#F5F5F5; --card:#F5F5F5; --border:#ECECEC; --primary:#76C457; --primary-soft:#F5F5F5; --error-bg:#F5F5F5; --error-border:#ECECEC; --text:#1a1a1a; --text-muted:#6b6b6b; }
+  @media (prefers-color-scheme: dark){ :root { --bg:#121212; --bg-soft:#1a1a1a; --card:#1e1e1e; --border:#2a2a2a; --primary:#76C457; --primary-soft:#1a2a1e; --error-bg:#2a1a1a; --error-border:#76C457; --text:#e5e5e5; --text-muted:#9a9a9a; } }
+  html,body{background:var(--bg);color:var(--text);font-family:Inter,Roboto,system-ui,sans-serif;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:.75rem;}
+  .btn-primary{background:var(--primary);color:#fff;}
+  .slide-menu{transform:translateX(-100%);transition:transform .25s ease;}
+  .slide-menu.open{transform:translateX(0);}
+  .overlay{display:none;}
+  .overlay.open{display:flex;}
+  .grid-stack-item-content{background:var(--card);border:1px solid var(--border);border-radius:.75rem;padding:.75rem;overflow:auto;}
+  .drop-zone{border:2px dashed var(--border);border-radius:.75rem;}
+  .drop-zone.dragover{border-color:var(--primary);background:var(--primary-soft);}
+  .bubble{width:1.75rem;height:1.75rem;border-radius:9999px;display:inline-flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:600;}
+  .bubble.green{background:#76C457;color:#1a1a1a;} .bubble.yellow{background:#ECECEC;color:#1a1a1a;} .bubble.red{background:#ECECEC;color:#1a1a1a;} .bubble.gray{background:#F5F5F5;color:#1a1a1a;}
+  .hint-box{background:#F5F5F5;border:1px solid #ECECEC;border-radius:.5rem;padding:.75rem;}
+  .error-tint{background:#F5F5F5;border:1px solid #ECECEC;}
+  .side-drawer{transform:translateX(100%);transition:transform .25s ease;}
+  .side-drawer.open{transform:translateX(0);}
+  .fab{position:fixed;bottom:1.25rem;left:50%;transform:translateX(-50%);z-index:50;}
+  .toast{position:fixed;bottom:1.25rem;left:50%;transform:translateX(-50%);z-index:9999;}
+  ::-webkit-scrollbar{width:8px;height:8px;} ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+</style>
+</head>
+<body class="h-full overflow-hidden">
+  <aside id="slideMenu" class="slide-menu fixed inset-y-0 left-0 w-72 z-40 card p-4 overflow-y-auto">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-semibold">Menu</h2>
+      <button onclick="closeMenu()" class="p-2" aria-label="Close menu"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <nav class="space-y-1">
+      <button class="w-full text-left px-3 py-2 rounded hover:bg-[var(--primary-soft)]" data-view="dashboard">Dashboard</button>
+      <button class="w-full text-left px-3 py-2 rounded hover:bg-[var(--primary-soft)]" data-view="notes">Notes</button>
+      <button class="w-full text-left px-3 py-2 rounded hover:bg-[var(--primary-soft)]" data-view="learning">Learning</button>
+      <button class="w-full text-left px-3 py-2 rounded hover:bg-[var(--primary-soft)]" data-view="graph">Graph</button>
+      <button class="w-full text-left px-3 py-2 rounded hover:bg-[var(--primary-soft)]" data-view="settings">Settings</button>
+    </nav>
+  </aside>
+  <div id="menuBackdrop" class="fixed inset-0 bg-black/40 z-30 hidden" onclick="closeMenu()"></div>
+  <header class="flex items-center justify-between px-3 py-2 border-b border-[var(--border)] bg-[var(--bg)] z-20">
+    <div class="flex items-center gap-2">
+      <button onclick="openMenu()" class="p-2 md:hidden" aria-label="Menu"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <button id="backBtn" class="p-2 hidden" aria-label="Back"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></button>
+      <span class="font-semibold">Dual-Hub</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="openModal('searchModal')" class="p-2" aria-label="Search"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/></svg></button>
+      <button onclick="toggleSidebar()" class="hidden md:inline-flex p-2" aria-label="Collapse sidebar"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg></button>
+      <button onclick="resetLayout()" class="px-3 py-1.5 rounded border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--primary-soft)] text-[var(--text)] text-sm" aria-label="Reset layout"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button>
+    </div>
+  </header>
+
+  <div class="flex h-[calc(100%-3rem)]">
+    <aside id="desktopSidebar" class="hidden md:flex flex-col w-56 border-r border-[var(--border)] p-3 gap-1">
+      <button class="text-left px-3 py-2 rounded hover:bg-[var(--primary-soft)]" data-view="dashboard">Dashboard</button>
+      <button class="text-left px-3 py-2 rounded hover:bg-[var(--primary-soft)]" data-view="notes">Notes</button>
+      <button class="text-left px-3 py-2 rounded hover:bg-[var(--primary-soft)]" data-view="learning">Learning</button>
+      <button class="text-left px-3 py-2 rounded hover:bg-[var(--primary-soft)]" data-view="graph">Graph</button>
+      <button class="text-left px-3 py-2 rounded hover:bg-[var(--primary-soft)]" data-view="settings">Settings</button>
+    </aside>
+    <main id="mainContent" class="flex-1 overflow-auto p-3">
+      <section id="view-dashboard" class="view">
+        <div class="grid-stack" id="dashboardGrid"></div>
+      </section>
+      <section id="view-notes" class="view hidden">
+        <div class="flex gap-3 h-full">
+          <div class="flex-1 flex flex-col gap-3">
+            <input id="noteSearchInput" placeholder="Search notes..." class="px-3 py-2 rounded border border-[var(--border)] bg-[var(--bg-soft)]" />
+            <div class="card p-3 flex-1 overflow-auto">
+              <input id="noteTitle" placeholder="Title" class="w-full text-xl font-semibold bg-transparent border-none outline-none mb-2" />
+              <textarea id="noteContent" placeholder="Write markdown... Use [[Note Title]] for links, - [ ] for checklists" class="w-full h-full bg-transparent border-none outline-none resize-none"></textarea>
+            </div>
+          </div>
+          <aside class="w-72 hidden lg:block card p-3 overflow-auto">
+            <h3 class="font-semibold mb-2">Outline</h3>
+            <ul id="noteOutline" class="text-sm space-y-1"></ul>
+            <h3 class="font-semibold mt-4 mb-2">Tags</h3>
+            <div id="noteTags" class="flex flex-wrap gap-1"></div>
+            <h3 class="font-semibold mt-4 mb-2">Tasks</h3>
+            <ul id="noteTasks" class="text-sm space-y-1"></ul>
+          </aside>
+        </div>
+      </section>
+      <section id="view-learning" class="view hidden">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="card p-3">
+            <h3 class="font-semibold mb-2">Subjects</h3>
+            <div id="subjectsList" class="space-y-1"></div>
+            <button id="addSubjectBtn" class="btn-primary px-3 py-1 rounded mt-2 text-sm">Add Subject</button>
+          </div>
+          <div class="card p-3">
+            <h3 class="font-semibold mb-2">Lessons Timeline</h3>
+            <div id="timelineView" class="text-sm space-y-2"></div>
+          </div>
+          <div class="card p-3 md:col-span-2">
+            <h3 class="font-semibold mb-2">Flashcards Due</h3>
+            <div id="flashcardArea" class="text-sm"></div>
+          </div>
+          <div class="card p-3 md:col-span-2">
+            <h3 class="font-semibold mb-2">Knowledge Gaps</h3>
+            <div id="gapsArea" class="text-sm"></div>
+          </div>
+        </div>
+      </section>
+      <section id="view-graph" class="view hidden">
+        <div class="flex h-full gap-3">
+          <div id="graphCanvas" class="flex-1 card"></div>
+          <aside class="w-72 card p-3 overflow-auto">
+            <h3 class="font-semibold mb-2">Controls</h3>
+            <label class="block text-sm">Node size <input type="range" id="nodeSizeSlider" min="5" max="30" value="10" class="w-full" /></label>
+            <label class="block text-sm mt-2">Link thickness <input type="range" id="linkThickSlider" min="1" max="6" value="2" class="w-full" /></label>
+            <label class="block text-sm mt-2">Center force <input type="range" id="centerForceSlider" min="0" max="100" value="30" class="w-full" /></label>
+            <label class="block text-sm mt-2">Repel force <input type="range" id="repelForceSlider" min="0" max="100" value="50" class="w-full" /></label>
+            <label class="block text-sm mt-2">Link force <input type="range" id="linkForceSlider" min="0" max="100" value="40" class="w-full" /></label>
+            <label class="block text-sm mt-2"><input type="checkbox" id="arrowsToggle" checked /> Arrows</label>
+            <label class="block text-sm mt-2">Threshold <input type="range" id="thresholdSlider" min="50" max="95" value="72" class="w-full" /></label>
+            <div id="graphPreview" class="mt-4 text-sm"></div>
+          </aside>
+        </div>
+      </section>
+      <section id="view-settings" class="view hidden">
+        <div class="card p-4 max-w-xl">
+          <h3 class="font-semibold mb-3">Settings</h3>
+          <label class="block mb-2">Gemini model
+            <select id="modelSelect" class="w-full border border-[var(--border)] rounded px-2 py-1 bg-[var(--bg-soft)]">
+              <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+              <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+            </select>
+          </label>
+          <label class="block mb-2">Font zoom <input type="range" id="fontZoomSlider" min="80" max="160" value="100" class="w-full" /></label>
+          <label class="block mb-2"><input type="checkbox" id="taskDetailToggle" /> Detailed task descriptions</label>
+          <label class="block mb-2"><input type="checkbox" id="hapticToggle" checked /> Haptic vibration</label>
+          <label class="block mb-2"><input type="checkbox" id="timerToggle" checked /> Quiz timer</label>
+          <label class="block mb-2"><input type="checkbox" id="externalKnowledgeToggle" /> Allow external knowledge in quizzes</label>
+          <button id="saveSettingsBtn" class="btn-primary px-4 py-2 rounded mt-2">Save</button>
+        </div>
+      </section>
+    </main>
+  </div>
+  <button id="fabBtn" class="fab btn-primary w-14 h-14 rounded-full shadow-lg flex items-center justify-center" aria-label="Quick ingest">
+    <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+  </button>
+  <div id="searchModal" class="overlay fixed inset-0 bg-black/50 z-50 items-start justify-center pt-20">
+    <div class="card w-full max-w-2xl p-4 mx-4">
+      <input id="globalSearchInput" placeholder="Search notes & learning (Ctrl+K)..." class="w-full px-3 py-2 rounded border border-[var(--border)] bg-[var(--bg-soft)]" />
+      <div id="searchResults" class="mt-3 max-h-96 overflow-auto text-sm"></div>
+      <div class="mt-3 text-right"><button onclick="closeModal('searchModal')" class="px-3 py-1 rounded border border-[var(--border)]">Close</button></div>
+    </div>
+  </div>
+  <div id="settingsModal" class="overlay fixed inset-0 bg-[var(--bg)] z-50 items-center justify-center">
+    <div class="w-full max-w-2xl p-6">
+      <h2 class="text-2xl font-semibold mb-4">Settings</h2>
+      <div id="settingsModalBody"></div>
+      <div class="mt-4 text-right"><button onclick="closeModal('settingsModal')" class="px-4 py-2 rounded border border-[var(--border)]">Back</button></div>
+    </div>
+  </div>
+  <div id="duplicateModal" class="overlay fixed inset-0 bg-black/50 z-50 items-center justify-center">
+    <div class="card max-w-md p-4 mx-4">
+      <h3 class="font-semibold mb-2">Duplicate file detected</h3>
+      <p class="text-sm mb-3">This file already exists. Choose an action:</p>
+      <div class="flex gap-2 justify-end">
+        <button id="dupCancelBtn" class="px-3 py-1 rounded border border-[var(--border)]">Cancel</button>
+        <button id="dupSkipBtn" class="px-3 py-1 rounded border border-[var(--border)]">Skip</button>
+        <button id="dupOverwriteBtn" class="btn-primary px-3 py-1 rounded">Overwrite</button>
+      </div>
+    </div>
+  </div>
+  <div id="quizModal" class="overlay fixed inset-0 bg-[var(--bg)] z-50 items-center justify-center">
+    <div class="w-full max-w-3xl p-4 overflow-auto max-h-full">
+      <div class="flex items-center justify-between mb-3">
+        <h2 id="quizTitle" class="text-xl font-semibold"></h2>
+        <button onclick="closeModal('quizModal')" class="p-2" aria-label="Close"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      </div>
+      <div id="quizStepper" class="flex gap-2 mb-4 flex-wrap"></div>
+      <div id="quizTimer" class="text-sm text-[var(--text-muted)] mb-2"></div>
+      <div id="quizQuestion" class="card p-4"></div>
+      <div id="quizFeedback" class="mt-3"></div>
+      <div class="flex gap-2 mt-4">
+        <button id="retryBtn" class="px-4 py-2 rounded border border-[var(--border)]">Atbildēt vēlreiz</button>
+        <button id="nextBtn" class="btn-primary px-4 py-2 rounded">Nākamais jautājums</button>
+      </div>
+    </div>
+  </div>
+  <aside id="graphDrawer" class="side-drawer fixed inset-y-0 right-0 w-80 z-40 card p-4 overflow-y-auto">
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-semibold">Preview</h3>
+      <button onclick="closeGraphDrawer()" class="p-2"><svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+    </div>
+    <div id="graphDrawerBody" class="text-sm"></div>
+  </aside>
+  <div id="toastContainer" class="toast"></div>
+  <script src="/app.js"></script>
+</body>
+</html>
+
